@@ -33,6 +33,7 @@ class AgentState(TypedDict):
     external_context: Dict[str, str]
     # Control flow
     human_approved: bool
+    human_comment: str | None
     final_report: PRReviewReport | None
 
 
@@ -54,9 +55,13 @@ def fetch_pr_context(state: AgentState):
     pr = repo.get_pull(int(pr_number))
     
     diff_content = ""
-    for file in pr.get_files():
+    files = list(pr.get_files())
+    print(f"Found {len(files)} files in PR.")
+    for file in files:
         if file.patch:
             diff_content += f"--- {file.filename}\n+++ {file.filename}\n{file.patch}\n\n"
+        else:
+            print(f"Warning: No patch for {file.filename} (might be a new large file or binary)")
             
     tmp_dir = tempfile.mkdtemp(prefix="pr_agent_")
     clone_url = repo.clone_url
@@ -77,10 +82,26 @@ def fetch_pr_context(state: AgentState):
 def analyze_diff_summary(state: AgentState):
     """Uses LLM to summarize the diff."""
     print("Summarizing diff...")
-    if not state.get('diff_content'):
-        return {"summary": None}
-    summary = generate_diff_summary(state['diff_content'])
-    return {"summary": summary}
+    diff_content = state.get('diff_content')
+    if not diff_content:
+        print("Empty diff content found!")
+        return {"summary": DiffSummary(
+            executive_summary="No changes detected or diff is unavailable.",
+            what_changed=[],
+            why_it_changed="N/A",
+            impact_assessment="None"
+        )}
+    try:
+        summary = generate_diff_summary(diff_content)
+        return {"summary": summary}
+    except Exception as e:
+        print(f"LLM Summary failed: {e}")
+        return {"summary": DiffSummary(
+            executive_summary=f"Failed to generate summary: {str(e)}",
+            what_changed=[],
+            why_it_changed="Error encountered during analysis.",
+            impact_assessment="Unknown"
+        )}
 
 
 def logic_footgun_detector(state: AgentState):
@@ -209,22 +230,34 @@ def post_to_github(state: AgentState):
                 print("No final report generated!")
                 return {}
                 
-            md_content = f"# Autonomous PR Review\n\n## Summary\n{report.summary.executive_summary if report.summary else 'No summary provided.'}\n\n"
+            md_content = "# Autonomous PR Review\n\n"
+            
+            human_comment = state.get("human_comment")
+            if human_comment:
+                md_content += f"## 📝 Human Reviewer Comments\n{human_comment}\n\n---\n\n"
+            
+            md_content += f"## Summary\n{report.summary.executive_summary if report.summary else 'No summary provided.'}\n\n"
             
             if report.footguns:
                 md_content += "## 🚨 Logic Footguns\n"
                 for f in report.footguns:
                     md_content += f"- **{f.file_path}:{f.line_number}** ({f.issue_type}): {f.description}\n  *Suggestion: {f.suggestion}*\n"
+            else:
+                md_content += "## 🚨 Logic Footguns\n✅ No logic issues or footguns detected.\n"
             
             if report.security_issues:
                 md_content += "\n## 🔒 Security Vulnerabilities\n"
                 for s in report.security_issues:
                     md_content += f"- **{s.file_path}:{s.line_number}** [{s.severity}] {s.cwe}: {s.description}\n  *Remediation: {s.remediation}*\n"
+            else:
+                md_content += "\n## 🔒 Security Vulnerabilities\n✅ No security vulnerabilities detected.\n"
                     
             if report.semantic_impacts:
                 md_content += "\n## 🌍 Semantic Impacts\n"
                 for i in report.semantic_impacts:
                     md_content += f"- Function `{i.changed_function}` impacted {len(i.impacted_call_sites)} call sites.\n"
+            else:
+                md_content += "\n## 🌍 Semantic Impacts\n✅ No external semantic impacts found.\n"
                     
             pr.create_issue_comment(md_content)
             print("Successfully posted comment!")

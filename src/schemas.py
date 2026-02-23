@@ -30,7 +30,7 @@ class SemanticImpactFinding(BaseModel):
 
 class PRReviewReport(BaseModel):
     pr_url: str
-    summary: DiffSummary
+    summary: Optional[DiffSummary] = None
     footguns: List[FootgunFinding]
     security_issues: List[SecurityVulnerability]
     semantic_impacts: List[SemanticImpactFinding]
