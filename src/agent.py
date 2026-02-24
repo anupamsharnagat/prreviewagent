@@ -22,7 +22,7 @@ from src.schemas import (
     SecurityVulnerability,
     SemanticImpactFinding
 )
-from src.llm_utils import generate_diff_summary, generate_footguns
+from src.llm_utils import generate_diff_summary, generate_footguns, generate_llm_security_findings
 
 class AgentState(TypedDict):
     pr_url: str
@@ -145,6 +145,14 @@ def security_scanner(state: AgentState):
     except Exception as e:
         print(f"Bandit execution failed: {e}")
         
+    # --- Fallback: LLM Security Scan (for Java, JS, HTML, etc.) ---
+    try:
+        print("Running fallback LLM security scan...")
+        llm_findings = generate_llm_security_findings(state.get('diff_content', ''))
+        security_issues.extend(llm_findings)
+    except Exception as e:
+        print(f"LLM Security Scan failed: {e}")
+        
     return {"security_issues": security_issues}
 
 
@@ -158,7 +166,8 @@ def semantic_impact_finder(state: AgentState):
     if not repo_path:
         return {"semantic_impacts": impacts}
         
-    added_funcs = re.findall(r'^\+def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(', diff_content, re.MULTILINE)
+    # Supports Python (def), Java/JS (public/private/void/function)
+    added_funcs = re.findall(r'^\+(?:def\s+|public\s+|private\s+|protected\s+|void\s+|function\s+)([a-zA-Z_][a-zA-Z0-9_]*)', diff_content, re.MULTILINE)
     
     for func in added_funcs:
         try:
