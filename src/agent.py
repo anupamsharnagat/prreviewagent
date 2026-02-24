@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import sys
 import tempfile
 import subprocess
 import sqlite3
@@ -125,7 +126,7 @@ def security_scanner(state: AgentState):
     security_issues = []
     try:
         result = subprocess.run(
-            ["bandit", "-r", repo_path, "-f", "json"],
+            [sys.executable, "-m", "bandit", "-r", repo_path, "-f", "json"],
             capture_output=True, text=True
         )
         if result.stdout:
@@ -188,6 +189,33 @@ def fetch_external_context(state: AgentState):
     """Fetches definitions of specific utilities."""
     print("Fetching external context...")
     return {"external_context": {"DatabaseDriver": "class DatabaseDriver: ... "}}
+
+
+def notify_reviewer(state: AgentState):
+    """Posts a status comment to GitHub to notify the user that review is ready."""
+    print("Notifying reviewer on GitHub...")
+    pr_url = state['pr_url']
+    match = re.search(r'github\.com/([^/]+)/([^/]+)/pull/(\d+)', pr_url)
+    if match:
+        owner, repo, pr_num = match.groups()
+        token = os.getenv("GITHUB_TOKEN")
+        g = Github(token)
+        repo_obj = g.get_repo(f"{owner}/{repo}")
+        pr = repo_obj.get_pull(int(pr_num))
+        
+        # Check if we already posted a notification to avoid spamming
+        comments = pr.get_issue_comments()
+        for comment in comments:
+            if "🔍 AI Analysis Complete" in comment.body:
+                return {} # Skip duplicate
+                
+        msg = (
+            f"### 🔍 AI Analysis Complete\n"
+            f"The AI PR Agent has finished scanning this PR. Findings are awaiting your approval in the local Control Room.\n"
+            f"\n*Note: This is an automated status message.*"
+        )
+        pr.create_issue_comment(msg)
+    return {}
 
 
 def human_approval(state: AgentState):
@@ -278,6 +306,7 @@ builder.add_node("logic_footgun_detector", logic_footgun_detector)
 builder.add_node("security_scanner", security_scanner)
 builder.add_node("semantic_impact_finder", semantic_impact_finder)
 builder.add_node("fetch_external_context", fetch_external_context)
+builder.add_node("notify_reviewer", notify_reviewer)
 builder.add_node("human_approval", human_approval)
 builder.add_node("post_to_github", post_to_github)
 
@@ -287,7 +316,8 @@ builder.add_edge("analyze_diff_summary", "logic_footgun_detector")
 builder.add_edge("logic_footgun_detector", "security_scanner")
 builder.add_edge("security_scanner", "semantic_impact_finder")
 builder.add_edge("semantic_impact_finder", "fetch_external_context")
-builder.add_edge("fetch_external_context", "human_approval")
+builder.add_edge("fetch_external_context", "notify_reviewer")
+builder.add_edge("notify_reviewer", "human_approval")
 builder.add_edge("human_approval", "post_to_github")
 builder.add_edge("post_to_github", END)
 

@@ -4,6 +4,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   review:
     name: Trigger Local AI Review
@@ -16,10 +20,6 @@ jobs:
           # 1. Change directory to where your PR Review Agent is installed
           cd "E:\rnd\antigravity\prreviewsystem"
           
-          # 2. Activate the virtual environment if you are using one
-          # For Windows (PowerShell):
-          & ".\.venv\Scripts\Activate.ps1"
-          
-          # 3. Trigger the analysis CLI
+          # 2. Trigger the analysis CLI using the direct path to the virtual environment
           $env:PYTHONPATH="."
-          python src/cli.py --url ${{ github.event.pull_request.html_url }}
+          .\.venv\Scripts\python.exe src/cli.py --url ${{ github.event.pull_request.html_url }}

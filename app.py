@@ -9,6 +9,10 @@ st.title("🤖 AI PR Reviewer: Control Room")
 
 # Sidebar: Browse Pending or Past Reviews
 st.sidebar.title("📨 Review Sessions")
+
+if st.sidebar.button("🔄 Refresh Data"):
+    st.rerun()
+
 checkpoints = list(memory.list(None))
 # Extract unique thread IDs from checkpoints
 unique_threads = sorted(list(set(cp.config["configurable"]["thread_id"] for cp in checkpoints)))

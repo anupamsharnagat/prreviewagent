@@ -4,6 +4,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   review:
     name: Run AI Review
@@ -22,8 +26,7 @@ jobs:
           
       - name: Install Dependencies
         run: |
-          & ".\.venv\Scripts\Activate.ps1"
-          pip install -r requirements.txt
+          .\.venv\Scripts\python.exe -m pip install -r requirements.txt
           
       - name: Run AI Agent
         env:
@@ -34,5 +37,4 @@ jobs:
         run: |
           # Set PYTHONPATH so it can find the src module
           $env:PYTHONPATH="."
-          & ".\.venv\Scripts\Activate.ps1"
-          python src/cli.py --url ${{ github.event.pull_request.html_url }}
+          .\.venv\Scripts\python.exe src/cli.py --url ${{ github.event.pull_request.html_url }}

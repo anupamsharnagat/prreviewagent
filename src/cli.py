@@ -1,6 +1,12 @@
 import sys
 import argparse
+import io
 from src.agent import graph
+
+# Ensure UTF-8 output even on Windows terminals
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 def run_analysis(pr_url: str):
     """
@@ -29,10 +35,14 @@ def run_analysis(pr_url: str):
     
     # stream returns an iterator of events
     for event in graph.stream(initial_state, config, stream_mode="values"):
-        if "summary" in event and event["summary"]:
-            print("Found Summary: " + event["summary"].executive_summary[:100] + "...")
-        if "footguns" in event:
-            print(f"Footguns detected: {len(event['footguns'])}")
+        try:
+            if "summary" in event and event["summary"]:
+                summary_text = str(event["summary"].executive_summary)[:100]
+                print(f"Found Summary: {summary_text}...")
+            if "footguns" in event:
+                print(f"Footguns detected: {len(event['footguns'])}")
+        except Exception as e:
+            print(f"Error printing event: {e}")
 
     print(f"\nAnalysis paused at checkpoint. You can now review it in the Streamlit UI.")
     print(f"Thread ID: {pr_url}")
