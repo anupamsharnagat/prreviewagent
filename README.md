@@ -6,10 +6,11 @@ A fully functional, autonomous PR Review Agent built with **LangGraph** and **Py
 
 ## ✨ Key Features
 - **Real GitHub Integration**: Fetches actual diffs and files using `PyGithub`.
+- **Automatic Triggers**: Integrated with **GitHub Actions** via self-hosted runners.
 - **Local LLM Intelligence**: Uses Ollama (`kimi-k2.5`) for deep semantic analysis.
 - **Security & Logic Scans**: Orchestrates `bandit` for security and custom LLM prompts for logic flaws.
 - **Semantic Impact Analysis**: Uses `ripgrep` to find call sites affected by source changes.
-- **Human-in-the-Loop UI**: Built with **Streamlit** to allow review, custom comments, and approval/rejection of reports.
+- **Persistent Control Room**: A **Streamlit** dashboard that stores and manages pending reviews in a SQLite database.
 
 ---
 
@@ -38,17 +39,19 @@ OPENAI_API_KEY=ollama
 pip install -r requirements.txt
 ```
 
-### 4. Run the Application
+### 4. Setup Automatic Triggers (Optional but Recommended)
+To allow GitHub to automatically send PRs to your local machine for analysis, follow the [RUNNER_SETUP.md](RUNNER_SETUP.md) guide.
+
+### 5. Run the Application
 The primary interface for the agent is the Streamlit UI.
 ```bash
 streamlit run app.py
 ```
 **Usage Flow:**
-1. Paste a GitHub PR URL (e.g., `https://github.com/owner/repo/pull/1`).
-2. The agent will clone the repo, run analysis, and pause.
-3. Review the findings in the UI.
-4. (Optional) Add your own comment for the developer.
-5. Click **Approve & Post** to send the report to GitHub.
+1. **Automated**: When a PR is raised, your PC automatically analyzes it.
+2. **Review**: Open the Streamlit UI and select the PR from the "Review Sessions" sidebar.
+3. **Approve**: Review findings, add a comment, and click **Approve & Post**.
+4. **Manual**: You can still paste a URL manually in the "New Review" section.
 
 ---
 

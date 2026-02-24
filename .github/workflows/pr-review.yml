@@ -1,0 +1,38 @@
+name: AI PR Reviewer
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  review:
+    name: Run AI Review
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        # Self-hosted runners usually have python ready, but we check/install if needed
+        # Or better yet, we assume the environment is already set up on the host.
+        run: |
+          python --version
+          
+      - name: Install Dependencies
+        run: |
+          & ".\.venv\Scripts\Activate.ps1"
+          pip install -r requirements.txt
+          
+      - name: Run AI Agent
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # These are usually defaults for local Ollama, but can be set in secrets if changed
+          OPENAI_BASE_URL: http://localhost:11434/v1
+          OPENAI_API_KEY: ollama
+        run: |
+          # Set PYTHONPATH so it can find the src module
+          $env:PYTHONPATH="."
+          & ".\.venv\Scripts\Activate.ps1"
+          python src/cli.py --url ${{ github.event.pull_request.html_url }}

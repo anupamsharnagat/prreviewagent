@@ -1,16 +1,36 @@
 import streamlit as st
 import asyncio
 
-from src.agent import graph
+from src.agent import graph, memory
 
 st.set_page_config(page_title="Autonomous PR Review Agent", layout="wide")
 
-st.title("Autonomous PR Review Agent")
+st.title("🤖 AI PR Reviewer: Control Room")
 
-if "thread_id" not in st.session_state:
-    st.session_state.thread_id = "pr_review_session_1"
-    
-pr_url = st.text_input("Enter GitHub PR URL:")
+# Sidebar: Browse Pending or Past Reviews
+st.sidebar.title("📨 Review Sessions")
+checkpoints = list(memory.list(None))
+# Extract unique thread IDs from checkpoints
+unique_threads = sorted(list(set(cp.config["configurable"]["thread_id"] for cp in checkpoints)))
+
+if not unique_threads:
+    st.sidebar.info("No active reviews found in database.")
+    selected_thread = "New Review"
+else:
+    selected_thread = st.sidebar.selectbox(
+        "Select a Review Session:", 
+        ["New Review"] + unique_threads,
+        index=0 if "thread_id" not in st.session_state else (unique_threads.index(st.session_state.thread_id) + 1 if st.session_state.thread_id in unique_threads else 0)
+    )
+
+if selected_thread == "New Review":
+    if "new_url_id" not in st.session_state:
+        st.session_state.new_url_id = f"manual_{len(unique_threads) + 1}"
+    st.session_state.thread_id = st.session_state.new_url_id
+    pr_url = st.text_input("Enter GitHub PR URL to Start New Analysis:")
+else:
+    st.session_state.thread_id = selected_thread
+    pr_url = selected_thread # By convention in our CLI, thread_id IS the URL
 
 config = {"configurable": {"thread_id": st.session_state.thread_id}}
 

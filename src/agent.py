@@ -3,11 +3,13 @@ import os
 import re
 import tempfile
 import subprocess
+import sqlite3
 from dotenv import load_dotenv
 from typing import TypedDict, List, Dict, Any, Annotated
 import operator
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
 from github import Github
 
 load_dotenv()
@@ -290,8 +292,10 @@ builder.add_edge("human_approval", "post_to_github")
 builder.add_edge("post_to_github", END)
 
 # Compile with interrupt
-memory = MemorySaver()
+conn = sqlite3.connect("checkpoints.db", check_same_thread=False)
+memory = SqliteSaver(conn)
 graph = builder.compile(
     checkpointer=memory,
     interrupt_before=["post_to_github"]
 )
+memory.setup() # Ensure tables are created
